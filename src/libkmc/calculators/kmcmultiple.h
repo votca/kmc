@@ -1,5 +1,5 @@
 /*
- * Copyright 2009-2011 The VOTCA Development Team (http://www.votca.org)
+ * Copyright 2009-2012 The VOTCA Development Team (http://www.votca.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,9 @@
  *
  */
 
-#ifndef __VOTCA_KMC_SINGLE_H
-#define	__VOTCA_KMC_SINGLE_H
+#ifndef __VOTCA_KMC_MULTIPLE_H
+#define	__VOTCA_KMC_MULTIPLE_H
 
-#include <votca/kmc/vssmgroup.h>
 #include <vector>
 #include <map>
 #include <iostream>
@@ -35,11 +34,11 @@ using namespace votca::kmc;
 
 
 
-class KMCSingle : public KMCCalculator 
+class KMCMultiple : public KMCCalculator 
 {
 public:
-    KMCSingle() {};
-   ~KMCSingle() {};
+    KMCMultiple() {};
+   ~KMCMultiple() {};
 
     void Initialize(const char *filename, Property *options );
     bool EvaluateFrame();
@@ -61,61 +60,64 @@ protected:
             
 };
 
-void KMCSingle::Initialize(const char *filename, Property *options )
+void KMCMultiple::Initialize(const char *filename, Property *options )
 {
+    cout << "---- KMCMultiple::Initialise ---- " << endl;
         // check that input in the file specified via -o optionsfile exists
-        if (options->exists("options.kmcsingle.runtime")) {
-	    _runtime = options->get("options.kmcsingle.runtime").as<double>();
+        if (options->exists("options.kmcmultiple.runtime")) {
+	    _runtime = options->get("options.kmcmultiple.runtime").as<double>();
 	}
 	else {
 	    throw invalid_argument("Error in kmcsingle: total run time is not provided");
         }
 
-    	if (options->exists("options.kmcsingle.outputtime")) {
-	    _dt = options->get("options.kmcsingle.outputtime").as<double>();
+    	if (options->exists("options.kmcmultiple.outputtime")) {
+	    _dt = options->get("options.kmcmultiple.outputtime").as<double>();
 	}
 	else {
-	    throw invalid_argument("Error in kmcsingle: output frequency is not provided");
+	    throw invalid_argument("Error in kmcmultiple: output frequency is not provided");
         }
 
-    	if (options->exists("options.kmcsingle.seed")) {
-	    _seed = options->get("options.kmcsingle.seed").as<int>();
+    	if (options->exists("options.kmcmultiple.seed")) {
+	    _seed = options->get("options.kmcmultiple.seed").as<int>();
 	}
 	else {
-	    throw invalid_argument("Error in kmcsingle: seed is not provided");
+	    throw invalid_argument("Error in kmcmultiple: seed is not provided");
         }
-   	if (options->exists("options.kmcsingle.injection")) {
-	    _injection_name = options->get("options.kmcsingle.injection").as<string>();
+   	if (options->exists("options.kmcmultiple.injection")) {
+	    _injection_name = options->get("options.kmcmultiple.injection").as<string>();
 	}
         else {
 	    _injection_name = "*";
-           throw invalid_argument("Error in kmcsingle: injection pattern is not provided. The simplest option is setting it to *.");
+           throw invalid_argument("Error in kmcmultiple: injection pattern is not provided. The simplest option is setting it to *.");
         }
         // check that the input has no empty fields and is valid
         if (_runtime <= 0 || _dt <= 0) {
-           throw invalid_argument("Error in kmcsingle: run time and frequency ('outputtime') must be greater than 0.");
+           throw invalid_argument("Error in kmcmultiple: run time and frequency ('outputtime') must be greater than 0.");
         }
         if (_injection_name.length() < 1) {
-           throw invalid_argument("Error in kmcsingle: injection pattern is empty. (The simplest option is setting it to '*'.)");
+           throw invalid_argument("Error in kmcmultiple: injection pattern is empty. (The simplest option is setting it to '*'.)");
         }
         
         _filename = filename;
 
-       //cout << _seed << endl;
        srand(_seed);
        votca::tools::Random::init(rand(), rand(), rand(), rand());
 
 }
 
-bool KMCSingle::EvaluateFrame()
+bool KMCMultiple::EvaluateFrame()
 {
+    cout << "---- KMCMultiple::EvaluateFrame ----" << endl;
 
     LoadGraph();
     RunKMC();
     return true;
 }
 
-void KMCSingle::LoadGraph() {
+void KMCMultiple::LoadGraph()
+{
+    cout << "-------- KMCMultiple::LoadGraph ----" << endl;
 
     Database db;
     db.Open( _filename );
@@ -135,8 +137,8 @@ void KMCSingle::LoadGraph() {
     }
     //delete stmt;
     cout << "  -Nodes: " << _nodes.size() << endl;
-    cout << "seed:" << _seed << endl;
-    if(_seed > _nodes.size()){ throw invalid_argument ("Error in kmcsingle: Seed is outside the range of nodes. Please specify an existing seed in your input file."); }
+    cout << "  -Seed:" << _seed << endl;
+    if(_seed > _nodes.size()){ throw invalid_argument ("Error in kmcmultiple: Seed is outside the range of nodes. Please specify an existing seed in your input file."); }
     cout << "  -Injection Points: " << _injection.size() << endl;
 
     delete stmt;
@@ -149,8 +151,8 @@ void KMCSingle::LoadGraph() {
         double rate12 = stmt->Column<double>(2);
         double rate21 = stmt->Column<double>(3);
         vec r = vec(stmt->Column<double>(4), stmt->Column<double>(5), stmt->Column<double>(6));
-        cout << "adding event " << n2 << " | " << rate12 << " | " << r << endl;
-        cout << "adding event " << n1 << " | " << rate21 << " | " << r << endl;
+        // cout << "adding event " << n2 << " | " << rate12 << " | " << r << endl;
+        // cout << "adding event " << n1 << " | " << rate21 << " | " << r << endl;
         n1->AddEvent(new link_t(n2, rate12, r));
         n2->AddEvent(new link_t(n1, rate21, -r));
         links += 2;
@@ -166,36 +168,25 @@ void KMCSingle::LoadGraph() {
 
 }
 
-void KMCSingle::RunKMC(void)
+void KMCMultiple::RunKMC(void)
 {
+    cout << "-------- KMCMultiple::RunKMC ---- " << endl;
+    double t = 0;
 
-	double t = 0;
+    srand(_seed);
+    votca::tools::Random::init(rand(), rand(), rand(), rand());
 
-        srand(_seed);
-        votca::tools::Random::init(rand(), rand(), rand(), rand());
+    // cout << " seed:size:site " << _seed << ":" << _injection.size() << ":" << Random::rand_uniform_int(_injection.size()) << endl;
+    current=_injection[Random::rand_uniform_int(_injection.size())];
+    cout <<"       Starting simulation at node: "<<current->_id-1<<endl;
 
-        // cout << " seed:size:site " << _seed << ":" << _injection.size() << ":" << Random::rand_uniform_int(_injection.size()) << endl;
-	current=_injection[Random::rand_uniform_int(_injection.size())];
-        cout <<" Starting simulation at node: "<<current->_id-1<<endl;
-	double next_output = _dt;
-    int i=0;
-    while(t<_runtime) {
-    	t+=current->WaitingTime();
-		current->onExecute(); // this line causes a Segmentation fault
-    	if(t > next_output) {
-    		next_output = t + _dt;
-    		cout << t << ": " << r << endl;
-    	}
-    }
-    _runtime = t;
-    WriteOcc();
-    cout << std::scientific << "\nKMC run finished\nAverage velocity (m/s): " << r/t*1e-9 << endl;
 }
 
-void KMCSingle::WriteOcc()
+void KMCMultiple::WriteOcc()
 {
+    cout << "---- KMCMultiple::WriteOcc ---- " << endl;
     Database db;
-    cout << "Opening for writing " << _filename << endl;
+    cout << "     Opening for writing " << _filename << endl;
 	db.Open(_filename);
 	db.Exec("BEGIN;");
 	Statement *stmt = db.Prepare("UPDATE segments SET occPe = ? WHERE id = ?;");  // electron occ. prob., check (think about) this
@@ -209,4 +200,4 @@ void KMCSingle::WriteOcc()
 	delete stmt;
 }
 
-#endif	/* __VOTCA_KMC_SINGLE_H */
+#endif	/* __VOTCA_KMC_MULTIPLE_H */

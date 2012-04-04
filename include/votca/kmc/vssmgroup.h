@@ -100,7 +100,7 @@ protected:
 template<typename event_t>
 inline void VSSMGroup<event_t>::onExecute()
 {
-	SelectEvent_BinarySearch()->onExecute();
+        SelectEvent_BinarySearch()->onExecute();
 	UpdateWaitingTime();
 }
 
@@ -124,14 +124,13 @@ event_t *VSSMGroup<event_t>::SelectEvent_BinarySearch()
 {
 	double u = 1.-Random::rand_uniform();
 	u=u*Rate();
-        cout << "u=" << u << endl;
 	double max = Rate();
 	// to a binary search in accumulated events
 	int imin=0;
 	int imax=_acc_rate.size();
 	while(imax - imin > 1) {
 		int imid=(int)((imin+imax)*0.5);
-		//std::cout << u << " " << _acc_rate[imid] << std::endl;
+		// std::cout << u << " " << _acc_rate[imid] << std::endl;
 		if(u<=_acc_rate[imid])
 			imax=imid;
 		else
