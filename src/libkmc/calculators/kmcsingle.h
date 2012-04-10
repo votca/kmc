@@ -136,7 +136,7 @@ void KMCSingle::LoadGraph() {
     //delete stmt;
     cout << "  -Nodes: " << _nodes.size() << endl;
     cout << "seed:" << _seed << endl;
-    if(_seed > _nodes.size()){ throw invalid_argument ("Error in kmcsingle: Seed is outside the range of nodes. Please specify an existing seed in your input file."); }
+    // if(_seed > _nodes.size()){ throw invalid_argument ("Error in kmcsingle: Seed is outside the range of nodes. Please specify an existing seed in your input file."); }
     cout << "  -Injection Points: " << _injection.size() << endl;
 
     delete stmt;
@@ -176,7 +176,7 @@ void KMCSingle::RunKMC(void)
 
         // cout << " seed:size:site " << _seed << ":" << _injection.size() << ":" << Random::rand_uniform_int(_injection.size()) << endl;
 	current=_injection[Random::rand_uniform_int(_injection.size())];
-        cout <<" Starting simulation at node: "<<current->_id-1<<endl;
+        cout <<" Starting simulation at node: "<< current->_id-1<<endl;
 	double next_output = _dt;
     int i=0;
     while(t<_runtime) {

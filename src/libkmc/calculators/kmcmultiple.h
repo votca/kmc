@@ -62,7 +62,7 @@ protected:
 
 void KMCMultiple::Initialize(const char *filename, Property *options )
 {
-    cout << "---- KMCMultiple::Initialise ---- " << endl;
+    cout << "---- KMCMultiple::Initialize " << endl;
         // check that input in the file specified via -o optionsfile exists
         if (options->exists("options.kmcmultiple.runtime")) {
 	    _runtime = options->get("options.kmcmultiple.runtime").as<double>();
@@ -108,7 +108,7 @@ void KMCMultiple::Initialize(const char *filename, Property *options )
 
 bool KMCMultiple::EvaluateFrame()
 {
-    cout << "---- KMCMultiple::EvaluateFrame ----" << endl;
+    cout << "---- KMCMultiple::EvaluateFrame "<< endl;
 
     LoadGraph();
     RunKMC();
@@ -117,11 +117,11 @@ bool KMCMultiple::EvaluateFrame()
 
 void KMCMultiple::LoadGraph()
 {
-    cout << "-------- KMCMultiple::LoadGraph ----" << endl;
+    cout << "-------- KMCMultiple::LoadGraph " << endl;
 
     Database db;
     db.Open( _filename );
-    cout << " Loading graph from " << _filename << endl;
+    cout << "         Loading graph from " << _filename << endl;
     Statement *stmt = db.Prepare("SELECT id, name FROM segments;");
 
     while (stmt->Step() != SQLITE_DONE) {
@@ -136,10 +136,10 @@ void KMCMultiple::LoadGraph()
         }
     }
     //delete stmt;
-    cout << "  -Nodes: " << _nodes.size() << endl;
-    cout << "  -Seed:" << _seed << endl;
-    if(_seed > _nodes.size()){ throw invalid_argument ("Error in kmcmultiple: Seed is outside the range of nodes. Please specify an existing seed in your input file."); }
-    cout << "  -Injection Points: " << _injection.size() << endl;
+    cout << "         -Nodes: " << _nodes.size() << endl;
+    cout << "         -Seed:" << _seed << endl;
+    cout << "         -Injection Points: " << _injection.size() << endl;
+    if(_seed > _injection.size()){ throw invalid_argument ("Error in kmcmultiple: Seed is outside the range of injection points. Please specify a different seed in your input file."); }
 
     delete stmt;
 
@@ -164,13 +164,12 @@ void KMCMultiple::LoadGraph()
         }
     }
     delete stmt;
-    cout << "  -Links: " << links << endl;
-
+    cout << "         -Links: " << links << endl;
 }
 
 void KMCMultiple::RunKMC(void)
 {
-    cout << "-------- KMCMultiple::RunKMC ---- " << endl;
+    cout << "-------- KMCMultiple::RunKMC " << endl;
     double t = 0;
 
     srand(_seed);
@@ -178,13 +177,13 @@ void KMCMultiple::RunKMC(void)
 
     // cout << " seed:size:site " << _seed << ":" << _injection.size() << ":" << Random::rand_uniform_int(_injection.size()) << endl;
     current=_injection[Random::rand_uniform_int(_injection.size())];
-    cout <<"       Starting simulation at node: "<<current->_id-1<<endl;
+    cout <<"         Starting simulation at node: "<<current->_id-1<<endl;
 
 }
 
 void KMCMultiple::WriteOcc()
 {
-    cout << "---- KMCMultiple::WriteOcc ---- " << endl;
+    cout << "---- KMCMultiple::WriteOcc " << endl;
     Database db;
     cout << "     Opening for writing " << _filename << endl;
 	db.Open(_filename);
