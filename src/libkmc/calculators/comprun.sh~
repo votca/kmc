@@ -6,7 +6,8 @@ echo ""
 echo "---- Compiling done. ----"
 
 echo ""
-echo ""
+echo "Press enter to continue executing the file."
+read nix
 echo ""
 
 echo "---- Executing ----"

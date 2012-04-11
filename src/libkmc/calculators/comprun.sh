@@ -14,7 +14,7 @@ echo "---- Executing ----"
 echo ""
 chmod 755 kmcstandalone.exe
 LD_LIBRARY_PATH=/people/thnfs/homes/kordt/votca/lib
-./kmcstandalone.exe
+time ./kmcstandalone.exe
 echo ""
 echo "---- Executing done. ----"
 

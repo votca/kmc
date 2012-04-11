@@ -100,8 +100,9 @@ void LoadGraph(vector<int> &segment, vector<int> &injsegment, vector<int> &pair_
     cout << "pairs: " << pair_seg1.size()/2 << endl;
 }
 
-void VSSMRun(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, vector<double> &occP)
+void VSSMRunSingle(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, vector<double> &occP)
 {
+    cout << "Algorithm: VSSM for a Single Charge" << endl;
     // Injection
     int position = votca::tools::Random::rand_uniform_int(injsegment.size());
     cout << "starting simulation at segment " << segment[position] << " (internal position " << position << ")" << endl;
@@ -145,8 +146,8 @@ void VSSMRun(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1,
             {
                 maxprob = newprob[j];
                 do_newconf = newconf[j];
-                normalize += newprob[j];
             }
+            normalize += newprob[j];
         }
         double dt = 0;
         // go forward in time
@@ -196,10 +197,149 @@ void VSSMRun(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1,
     }
 }
 
+void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, unsigned int numberofcharges, vector<double> &occP)
+{
+    cout << "Algorithm: VSSM for Multiple Charges" << endl;
+    cout << "number of charges: " << numberofcharges << endl;
+    cout << "number of nodes: " << segment.size() << endl;
+    vector<int> occupied(segment.size(),0);
+    if(numberofcharges>segment.size())
+    {
+        throw runtime_error("Error in kmcstandalone: Your number of charges is larger than the number of nodes. This conflicts with single occupation.");
+    }
+    // Injection
+    vector<int> position(numberofcharges,0);
+    for(unsigned int charge=0; charge<numberofcharges; charge++)
+    {
+        position[charge]= votca::tools::Random::rand_uniform_int(injsegment.size());
+        while(occupied[position[charge]] == 1)
+        {   // maybe already occupied?
+            position[charge]= votca::tools::Random::rand_uniform_int(injsegment.size());
+        }
+        occupied[position[charge]] = 1;
+        cout << "starting position for charge " << charge+1 << ": segment " << segment[position[charge]] << " (internal position " << position[charge] << ")" << endl;
+    }        
+
+    double time = 0;
+    int step = 0;
+    double normalize = 0;
+    int do_newconf;
+    int do_newaffectedcharge;
+    double maxprob = 0;
+    while(time < runtime)
+    {
+        // cout << int(time/runtime *100) << "% done" << endl;
+        // make a list of all possible reactions and rates
+        vector<int> newconf(0);
+        vector<double> newprob(0);
+        vector<int> newaffectedcharge(0);
+        for(unsigned int charge=0; charge<numberofcharges; charge++)
+        {
+            if(verbose >= 1) {cout << "charge " << charge+1 << " at node " << segment[position[charge]] << " - possible jumps: " ;}
+            for (unsigned int j=0; j<pair_seg1.size(); j++)
+            {
+                if(pair_seg1[j] == segment[position[charge]])
+                {
+                    newconf.push_back(pair_seg2[j]);
+                    newprob.push_back(pair_rate[j] * votca::tools::Random::rand_uniform());
+                    newaffectedcharge.push_back(charge);
+                    if(verbose >= 1) {cout << pair_seg2[j] << " ";}
+                }
+            }
+            if(verbose >= 1) {cout << endl;}
+        }
+        if(verbose >= 1) {cout << endl;}
+        
+        // this should not happen: no possible jumps defined for a node
+        if (newconf.size() == 0)
+        {
+            cout << "WARNING: no possible jumps found current seqments. The charge is trapped here. Press Enter to continue anyway." << endl;
+            cin.get();
+        }
+        
+        // get reaction with the highest probability and sum up probabilites
+        maxprob = 0;
+        normalize = 0;
+        for(unsigned int j=0; j<newprob.size(); j++)
+        {
+            if(newprob[j] > maxprob)
+            {
+                maxprob = newprob[j];
+                do_newconf = newconf[j];
+                do_newaffectedcharge = newaffectedcharge[j];
+            }
+            normalize += newprob[j];
+        }
+        // go forward in time
+        double dt = 0;
+        if(normalize == 0)
+        {
+            throw runtime_error("Error in kmcsingle: Incorrect rates in the database file. All the outgoing rates for the current nodes are 0.");
+        }
+        else
+        {
+            double u = votca::tools::Random::rand_uniform();
+            while(u == 0)
+            {
+                cout << "WARNING: encountered 0 as a random variable! New try." << endl;
+                u = votca::tools::Random::rand_uniform();
+            }
+                
+            dt = -1 / normalize * log(u);
+        }
+        time += dt;
+        step += 1;
+        // jump!
+        for(unsigned int j=0; j<=segment.size(); j++)
+        {
+            if(segment[j] == do_newconf)
+            {
+                if(verbose == 1)
+                {
+                    cout << "EVENT for charge " << do_newaffectedcharge+1 << endl;
+                    cout << "  old segment " << segment[position[do_newaffectedcharge]] << " (occupation: " << occupied[position[do_newaffectedcharge]] << ")" << endl;
+                    cout << "  new segment " << do_newconf << " (occupation: " << occupied[j] << ")" << endl;
+                }
+                if(occupied[j]==0)
+                {
+                    occupied[position[do_newaffectedcharge]] = 0;
+                    position[do_newaffectedcharge] = j;
+                    occupied[j] = 1;
+                    if(verbose == 1) {cout << "  charge " << do_newaffectedcharge+1 << " jumps to node " << do_newconf << "." << endl;}
+                }
+                else
+                {
+                    if(verbose == 1) {cout << "no jump for charge " << do_newaffectedcharge+1 << ", node " << do_newconf << " is occupied." << endl;}
+                }
+                break;
+            }
+        }
+        if(verbose >= 1) 
+        {
+            cout << "t = " << time << "   dt = " << dt << "    (step " << step << ")" << endl;
+            cout << "normalize=" << normalize << endl;
+        }
+        progressbar(time/runtime);
+        if(verbose == 1) {cout << endl << endl;}
+        // update occupation probability
+        occP[position[0]] += dt;
+    }
+    
+    cout << endl << "finished KMC simulation after " << step << " steps." << endl << endl;
+
+    // divide by time to get occupation probabilites instead of occupation times
+    for(unsigned int j=0; j<occP.size();j++) 
+    {
+        occP[j] /= time;
+    }
+}
+
+
 int main(int argc, char** argv)
 {
-    double runtime = 1E5;
+    double runtime = 1E4;
     int seed  = 23;
+    unsigned int numberofcharges = 5;
     
     std::cout << "-----------------------------------" << std::endl;      
     std::cout << "KMC Standalone for testing purposes" << std::endl;
@@ -222,7 +362,7 @@ int main(int argc, char** argv)
     // VSSM KMC algorithm
     cout << endl << "KMC SIMULATION" << endl;
     vector<double> occP(segment.size(),0.);
-    VSSMRun(segment, injsegment, pair_seg1, pair_seg2, pair_rate, runtime, occP);
+    VSSMRunMultiple(segment, injsegment, pair_seg1, pair_seg2, pair_rate, runtime, numberofcharges, occP);
     
     // output occupation probabilites
     for(unsigned int j=0; j<occP.size();j++) 
