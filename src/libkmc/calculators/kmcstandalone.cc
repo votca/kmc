@@ -18,6 +18,7 @@
 #include "/people/thnfs/homes/kordt/votca/include/votca/tools/random.h"
 
 using namespace std;
+int verbose = 0; // 0=minimal output, 1=verbose output
 
 
 string singlequery(votca::tools::Database db, string statement)
@@ -29,6 +30,29 @@ string singlequery(votca::tools::Database db, string statement)
         result += stmt->Column<string>(0);
     }
     return result;
+}
+
+void progressbar(double fraction)
+{
+    int totalbars = 50;
+    std::cout << "\r";
+    for(double bars=0; bars<double(totalbars); bars++)
+    {
+        if(bars<=fraction*double(totalbars))
+        {
+            std::cout << "|";
+        }
+        else
+        {
+            std::cout << "-";
+        }
+    }
+    std::cout << "  " << int(fraction*1000)/10. <<" %   ";
+    std::cout << std::flush;
+    if(fraction*100 == 100)
+    {
+        std::cout << std::endl;
+    }
 }
 
 void LoadGraph(vector<int> &segment, vector<int> &injsegment, vector<int> &pair_seg1, vector<int> &pair_seg2, vector<double> &pair_rate)
@@ -76,68 +100,12 @@ void LoadGraph(vector<int> &segment, vector<int> &injsegment, vector<int> &pair_
     cout << "pairs: " << pair_seg1.size()/2 << endl;
 }
 
-void progressbar(double fraction)
+void VSSMRun(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, vector<double> &occP)
 {
-    int totalbars = 50;
-    std::cout << "\r";
-    for(double bars=0; bars<double(totalbars); bars++)
-    {
-        if(bars<=fraction*double(totalbars))
-        {
-            std::cout << "|";
-        }
-        else
-        {
-            std::cout << "-";
-        }
-    }
-    std::cout << "  " << int(fraction*1000)/10. <<" %   ";
-    std::cout << std::flush;
-    if(fraction*100 == 100)
-    {
-        std::cout << std::endl;
-    }
-}
-
-
-int main(int argc, char** argv)
-{
-    double runtime = 1E4;
-    int seed  = 23;
-    int verbose = 0; // 0=minimal output, 1=verbose output
-    
-    std::cout << "-----------------------------------" << std::endl;      
-    std::cout << "KMC Standalone for testing purposes" << std::endl;
-    std::cout << "-----------------------------------" << std::endl << std::endl;      
-
-    // Load Graph
-    vector<int> segment(0);
-    vector<int> injsegment(0);
-    vector<int> pair_seg1(0);
-    vector<int> pair_seg2(0);
-    vector<double> pair_rate(0);
-    LoadGraph(segment, injsegment, pair_seg1, pair_seg2, pair_rate);
-    vector<double> occP(segment.size(),0.);
-    
-//    cout << "segments: " << endl;
-//    for(unsigned int j=0; j<segment.size(); j++)
-//    {
-//        cout << j << ": segment " << segment[j] << endl;
-//    }
-//    return 1;
-
-    // Initialise random number generator
-    cout << endl << "INITIALISING RANDOM NUMBER GENERATOR" << endl;
-    srand(seed); // srand expects any integer in order to initialise the random number generator
-    votca::tools::Random::init(rand(), rand(), rand(), rand());
-    
     // Injection
-    cout << endl << "INJECTION" << endl;
     int position = votca::tools::Random::rand_uniform_int(injsegment.size());
     cout << "starting simulation at segment " << segment[position] << " (internal position " << position << ")" << endl;
-    
-    // VSSM KMC algorithm
-    cout << endl << "KMC SIMULATION" << endl;
+
     double time = 0;
     int step = 0;
     double normalize = 0;
@@ -164,7 +132,7 @@ int main(int argc, char** argv)
         // this should not happen: no possible jumps defined for a node
         if (newconf.size() == 0)
         {
-            cout << "WARNING: no possible jumps found from seqment " << segment[position] << ". This will not result in anything reasonable. Press Enter to continue anyway." << endl;
+            cout << "WARNING: no possible jumps found from seqment " << segment[position] << ". The charge is trapped here. Press Enter to continue anyway." << endl;
             cin.get();
         }
         
@@ -184,7 +152,7 @@ int main(int argc, char** argv)
         // go forward in time
         if(normalize == 0)
         {
-            throw runtime_error("Error in kmcsingle: Incorrect rates in the database file. All the outgoing rates for the current segment are 0");
+            throw runtime_error("Error in kmcsingle: Incorrect rates in the database file. All the outgoing rates for the current segment are 0.");
         }
         else
         {
@@ -219,12 +187,46 @@ int main(int argc, char** argv)
         }
     }
     
-    cout << "finished KMC simulation after " << step << " steps." << endl;
-    
+    cout << endl << "finished KMC simulation after " << step << " steps." << endl << endl;
+
     // divide by time to get occupation probabilites instead of occupation times
     for(unsigned int j=0; j<occP.size();j++) 
     {
         occP[j] /= time;
+    }
+}
+
+int main(int argc, char** argv)
+{
+    double runtime = 1E5;
+    int seed  = 23;
+    
+    std::cout << "-----------------------------------" << std::endl;      
+    std::cout << "KMC Standalone for testing purposes" << std::endl;
+    std::cout << "-----------------------------------" << std::endl << std::endl;      
+
+    // Load Graph
+    vector<int> segment(0);
+    vector<int> injsegment(0);
+    vector<int> pair_seg1(0);
+    vector<int> pair_seg2(0);
+    vector<double> pair_rate(0);
+    LoadGraph(segment, injsegment, pair_seg1, pair_seg2, pair_rate);
+
+    // Initialise random number generator
+    cout << endl << "INITIALISING RANDOM NUMBER GENERATOR" << endl;
+    srand(seed); // srand expects any integer in order to initialise the random number generator
+    votca::tools::Random::init(rand(), rand(), rand(), rand());
+    
+   
+    // VSSM KMC algorithm
+    cout << endl << "KMC SIMULATION" << endl;
+    vector<double> occP(segment.size(),0.);
+    VSSMRun(segment, injsegment, pair_seg1, pair_seg2, pair_rate, runtime, occP);
+    
+    // output occupation probabilites
+    for(unsigned int j=0; j<occP.size();j++) 
+    {
         if(occP[j] > 0)
         {
             cout << "occupation probability " << segment[j] << ": " << occP[j] << " (internal position: "<< j << ")" << endl;
