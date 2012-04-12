@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include <omp.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -18,7 +20,7 @@
 #include "/people/thnfs/homes/kordt/votca/include/votca/tools/random.h"
 
 using namespace std;
-int verbose = 0; // 0=minimal output, 1=verbose output
+int verbose = 1; // 0=minimal output, 1=verbose output
 
 
 string singlequery(votca::tools::Database db, string statement)
@@ -30,6 +32,38 @@ string singlequery(votca::tools::Database db, string statement)
         result += stmt->Column<string>(0);
     }
     return result;
+}
+
+int OMPinfo() 
+{
+    int nthreads, tid, procs, maxt, inpar, dynamic, nested;
+    printf("\n||\n|| openMP PARALLEL COMPUTATION STATUS:\n");
+    /* Start parallel region */
+    #pragma omp parallel private(tid)
+    {
+        /* Obtain thread number */
+        tid = omp_get_thread_num();
+        /* Only master thread does this */
+        if (tid == 0) 
+        {
+            // printf("Thread %d getting environment info...\n", tid);
+            /* Get environment information */
+            procs = omp_get_num_procs();
+            nthreads = omp_get_num_threads();
+            maxt = omp_get_max_threads();
+            inpar = omp_in_parallel();
+            dynamic = omp_get_dynamic();
+            nested = omp_get_nested();
+            /* Print environment information */
+            printf("|| Number of processors = %d\n", procs);
+            printf("|| Number of threads = %d\n", nthreads);
+            // printf("|| Max threads = %d\n", maxt);
+            printf("|| In parallel? = %d\n||\n", inpar);
+            // printf("|| Dynamic threads enabled? = %d\n", dynamic);
+            // printf("|| Nested parallelism supported? = %d\n", nested);
+        }
+    }  /* Done */
+    return nthreads;
 }
 
 void progressbar(double fraction)
@@ -126,7 +160,8 @@ void VSSMRunSingle(vector<int> segment, vector<int> injsegment, vector<int> pair
             {
                 newconf.push_back(pair_seg2[j]);
                 newprob.push_back(pair_rate[j] * votca::tools::Random::rand_uniform());
-                if(verbose >= 1) {cout << pair_seg2[j] << " ";}
+                # pragma omp master
+                { if(verbose >= 1) {cout << pair_seg2[j] << " ";} }
             }
         }
         if(verbose >= 1) {cout << endl;}
@@ -197,12 +232,13 @@ void VSSMRunSingle(vector<int> segment, vector<int> injsegment, vector<int> pair
     }
 }
 
-void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, unsigned int numberofcharges, vector<double> &occP)
+vector<double> VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, unsigned int numberofcharges)
 {
     cout << "Algorithm: VSSM for Multiple Charges" << endl;
     cout << "number of charges: " << numberofcharges << endl;
     cout << "number of nodes: " << segment.size() << endl;
     vector<int> occupied(segment.size(),0);
+    vector<double> occP(segment.size(),0.);
     if(numberofcharges>segment.size())
     {
         throw runtime_error("Error in kmcstandalone: Your number of charges is larger than the number of nodes. This conflicts with single occupation.");
@@ -211,18 +247,20 @@ void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pa
     vector<int> position(numberofcharges,0);
     for(unsigned int charge=0; charge<numberofcharges; charge++)
     {
-        position[charge]= votca::tools::Random::rand_uniform_int(injsegment.size());
+        #pragma omp critical
+        {position[charge]= votca::tools::Random::rand_uniform_int(injsegment.size());}
         while(occupied[position[charge]] == 1)
         {   // maybe already occupied?
-            position[charge]= votca::tools::Random::rand_uniform_int(injsegment.size());
+            #pragma omp critical
+            {position[charge]= votca::tools::Random::rand_uniform_int(injsegment.size());}
         }
         occupied[position[charge]] = 1;
         cout << "starting position for charge " << charge+1 << ": segment " << segment[position[charge]] << " (internal position " << position[charge] << ")" << endl;
     }        
 
-    double time = 0;
+    double time = 0.;
     int step = 0;
-    double normalize = 0;
+    double normalize = 0.;
     int do_newconf;
     int do_newaffectedcharge;
     double maxprob = 0;
@@ -235,13 +273,16 @@ void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pa
         vector<int> newaffectedcharge(0);
         for(unsigned int charge=0; charge<numberofcharges; charge++)
         {
-            if(verbose >= 1) {cout << "charge " << charge+1 << " at node " << segment[position[charge]] << " - possible jumps: " ;}
+            ConditionedOutput(string(charge+1));
+            //# pragma omp master
+            //{ if(verbose >= 1) {cout << "charge " << charge+1 << " at node " << segment[position[charge]] << " - possible jumps: " ;} }
             for (unsigned int j=0; j<pair_seg1.size(); j++)
             {
                 if(pair_seg1[j] == segment[position[charge]])
                 {
                     newconf.push_back(pair_seg2[j]);
-                    newprob.push_back(pair_rate[j] * votca::tools::Random::rand_uniform());
+                    #pragma omp critical
+                    {newprob.push_back(pair_rate[j] * votca::tools::Random::rand_uniform());}
                     newaffectedcharge.push_back(charge);
                     if(verbose >= 1) {cout << pair_seg2[j] << " ";}
                 }
@@ -258,7 +299,7 @@ void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pa
         }
         
         // get reaction with the highest probability and sum up probabilites
-        maxprob = 0;
+        maxprob = 0.;
         normalize = 0;
         for(unsigned int j=0; j<newprob.size(); j++)
         {
@@ -278,11 +319,14 @@ void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pa
         }
         else
         {
-            double u = votca::tools::Random::rand_uniform();
+            double u;
+            #pragma omp critical
+            {u = votca::tools::Random::rand_uniform();}
             while(u == 0)
             {
                 cout << "WARNING: encountered 0 as a random variable! New try." << endl;
-                u = votca::tools::Random::rand_uniform();
+                #pragma omp critical
+                {u = votca::tools::Random::rand_uniform();}
             }
                 
             dt = -1 / normalize * log(u);
@@ -294,33 +338,44 @@ void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pa
         {
             if(segment[j] == do_newconf)
             {
-                if(verbose == 1)
+                # pragma omp master
                 {
-                    cout << "EVENT for charge " << do_newaffectedcharge+1 << endl;
-                    cout << "  old segment " << segment[position[do_newaffectedcharge]] << " (occupation: " << occupied[position[do_newaffectedcharge]] << ")" << endl;
-                    cout << "  new segment " << do_newconf << " (occupation: " << occupied[j] << ")" << endl;
+                    if(verbose == 1)
+                    {
+                        cout << "EVENT for charge " << do_newaffectedcharge+1 << endl;
+                        cout << "  old segment " << segment[position[do_newaffectedcharge]] << " (occupation: " << occupied[position[do_newaffectedcharge]] << ")" << endl;
+                        cout << "  new segment " << do_newconf << " (occupation: " << occupied[j] << ")" << endl;
+                    }
                 }
                 if(occupied[j]==0)
                 {
                     occupied[position[do_newaffectedcharge]] = 0;
                     position[do_newaffectedcharge] = j;
                     occupied[j] = 1;
-                    if(verbose == 1) {cout << "  charge " << do_newaffectedcharge+1 << " jumps to node " << do_newconf << "." << endl;}
+                    # pragma omp master
+                    { if(verbose == 1) {cout << "  charge " << do_newaffectedcharge+1 << " jumps to node " << do_newconf << "." << endl;} }
                 }
                 else
                 {
-                    if(verbose == 1) {cout << "no jump for charge " << do_newaffectedcharge+1 << ", node " << do_newconf << " is occupied." << endl;}
+                    # pragma omp master
+                    { if(verbose == 1) {cout << "no jump for charge " << do_newaffectedcharge+1 << ", node " << do_newconf << " is occupied." << endl;} }
                 }
                 break;
             }
         }
-        if(verbose >= 1) 
-        {
-            cout << "t = " << time << "   dt = " << dt << "    (step " << step << ")" << endl;
-            cout << "normalize=" << normalize << endl;
+        # pragma omp master
+        { 
+            if(verbose >= 1) 
+            {
+                cout << "t = " << time << "   dt = " << dt << "    (step " << step << ")" << "[thread " << omp_get_thread_num() << "]" << endl;
+                cout << "normalize=" << normalize << endl;
+            }
         }
-        progressbar(time/runtime);
-        if(verbose == 1) {cout << endl << endl;}
+        # pragma omp master
+        { 
+            progressbar(time/runtime); }
+            if(verbose == 1) {cout << endl << endl;
+        }
         // update occupation probability
         occP[position[0]] += dt;
     }
@@ -332,12 +387,14 @@ void VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pa
     {
         occP[j] /= time;
     }
+    return occP;
+    
 }
 
 
 int main(int argc, char** argv)
 {
-    double runtime = 1E4;
+    double runtime = 1E5;
     int seed  = 23;
     unsigned int numberofcharges = 5;
     
@@ -361,9 +418,45 @@ int main(int argc, char** argv)
    
     // VSSM KMC algorithm
     cout << endl << "KMC SIMULATION" << endl;
+    // unsigned int numberofthreads = OMPinfo();
+    unsigned int numberofthreads = 2;
+    cout << "NUMBER OF THREADS " << numberofthreads << endl;
     vector<double> occP(segment.size(),0.);
-    VSSMRunMultiple(segment, injsegment, pair_seg1, pair_seg2, pair_rate, runtime, numberofcharges, occP);
+    vector< vector< double > > occPOneRun ( numberofthreads, vector<double> ( segment.size(), 0. ) );
+
+    (void) omp_set_num_threads(numberofthreads);
+    #pragma omp parallel
+    {
+       occPOneRun[omp_get_thread_num()] = VSSMRunMultiple(segment, injsegment, pair_seg1, pair_seg2, pair_rate, runtime/double(numberofthreads), numberofcharges);
+    }
+
     
+    // get mean of multiple runs
+    for(unsigned int j=0; j<occP.size();j++) 
+    {
+        for(unsigned int thread=0; thread<numberofthreads; thread++)
+        {
+            occP[j] += occPOneRun[thread][j];
+        }
+    }
+    for(unsigned int j=0; j<occP.size();j++) 
+    {
+         occP[j] /= numberofthreads;
+    }
+    
+    // output occupation probabilites
+    for(unsigned int thread=0; thread<numberofthreads; thread++)
+    {
+        for(unsigned int j=0; j<occPOneRun[thread].size();j++) 
+        {
+            if(occPOneRun[thread][j] > 0)
+            {
+                cout << "[thread " << thread+1 << "] "<<"occupation probability " << segment[j] << ": " << occPOneRun[thread][j] << " (internal position: "<< j << ")" << endl;
+            }
+        }
+    }
+
+
     // output occupation probabilites
     for(unsigned int j=0; j<occP.size();j++) 
     {
