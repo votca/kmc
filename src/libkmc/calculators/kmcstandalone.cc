@@ -134,9 +134,29 @@ void LoadGraph(vector<int> &segment, vector<int> &injsegment, vector<int> &pair_
     cout << "pairs: " << pair_seg1.size()/2 << endl;
 }
 
-void VSSMRunSingle(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, vector<double> &occP)
+void WriteOcc(vector<double> occP, vector<int> segment)
+{
+    string filename = "/people/thnfs/homes/kordt/votca/votca_ctp_testsuite/norma/work/state.db";
+    votca::tools::Database db;
+    cout << "Opening for writing " << filename << endl;
+	db.Open(filename);
+	db.Exec("BEGIN;");
+	votca::tools::Statement *stmt = db.Prepare("UPDATE segments SET occPe = ? WHERE id = ?;");  // electron occ. prob., check (think about) this
+	for(unsigned int i=0; i<segment.size(); ++i)
+        {
+	    stmt->Reset();
+	    stmt->Bind(1, occP[i]);
+	    stmt->Bind(2, segment[i]);
+	    stmt->Step();
+	}
+	db.Exec("END;");
+	delete stmt;
+}
+
+vector<double> VSSMRunSingle(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime)
 {
     cout << "Algorithm: VSSM for a Single Charge" << endl;
+    vector<double> occP(segment.size(),0.);
     // Injection
     int position = votca::tools::Random::rand_uniform_int(injsegment.size());
     cout << "starting simulation at segment " << segment[position] << " (internal position " << position << ")" << endl;
@@ -221,6 +241,7 @@ void VSSMRunSingle(vector<int> segment, vector<int> injsegment, vector<int> pair
                 break;
             }
         }
+        
     }
     
     cout << endl << "finished KMC simulation after " << step << " steps." << endl << endl;
@@ -230,6 +251,7 @@ void VSSMRunSingle(vector<int> segment, vector<int> injsegment, vector<int> pair
     {
         occP[j] /= time;
     }
+    return occP;
 }
 
 vector<double> VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vector<int> pair_seg1, vector<int> pair_seg2, vector<double> pair_rate, double runtime, unsigned int numberofcharges)
@@ -390,7 +412,6 @@ vector<double> VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vect
     
 }
 
-
 int main(int argc, char** argv)
 {
     double runtime = 1E5;
@@ -418,6 +439,7 @@ int main(int argc, char** argv)
     // VSSM KMC algorithm
     cout << endl << "KMC SIMULATION" << endl;
     unsigned int numberofthreads = OMPinfo();
+    // unsigned int numberofthreads = 1;
     cout << "NUMBER OF THREADS " << numberofthreads << endl;
     vector<double> occP(segment.size(),0.);
     vector< vector< double > > occPOneRun ( numberofthreads, vector<double> ( segment.size(), 0. ) );
@@ -426,6 +448,7 @@ int main(int argc, char** argv)
     #pragma omp parallel
     {
        occPOneRun[omp_get_thread_num()] = VSSMRunMultiple(segment, injsegment, pair_seg1, pair_seg2, pair_rate, runtime/double(numberofthreads), numberofcharges);
+       // occPOneRun[omp_get_thread_num()] = VSSMRunSingle(segment, injsegment, pair_seg1, pair_seg2, pair_rate, runtime/double(numberofthreads));
     }
 
     
@@ -463,6 +486,9 @@ int main(int argc, char** argv)
             cout << "occupation probability " << segment[j] << ": " << occP[j] << " (internal position: "<< j << ")" << endl;
         }
     }
+    
+    // write occupation probabilites
+    WriteOcc(occP, segment);
 
     return (EXIT_SUCCESS);
 }
