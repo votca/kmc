@@ -20,7 +20,7 @@
 #include "/people/thnfs/homes/kordt/votca/include/votca/tools/random.h"
 
 using namespace std;
-int verbose = 1; // 0=minimal output, 1=verbose output
+int verbose = 0; // 0=minimal output, 1=verbose output
 
 
 string singlequery(votca::tools::Database db, string statement)
@@ -273,9 +273,8 @@ vector<double> VSSMRunMultiple(vector<int> segment, vector<int> injsegment, vect
         vector<int> newaffectedcharge(0);
         for(unsigned int charge=0; charge<numberofcharges; charge++)
         {
-            ConditionedOutput(string(charge+1));
-            //# pragma omp master
-            //{ if(verbose >= 1) {cout << "charge " << charge+1 << " at node " << segment[position[charge]] << " - possible jumps: " ;} }
+            # pragma omp master
+            { if(verbose >= 1) {cout << "charge " << charge+1 << " at node " << segment[position[charge]] << " - possible jumps: " ;} }
             for (unsigned int j=0; j<pair_seg1.size(); j++)
             {
                 if(pair_seg1[j] == segment[position[charge]])
@@ -418,8 +417,7 @@ int main(int argc, char** argv)
    
     // VSSM KMC algorithm
     cout << endl << "KMC SIMULATION" << endl;
-    // unsigned int numberofthreads = OMPinfo();
-    unsigned int numberofthreads = 2;
+    unsigned int numberofthreads = OMPinfo();
     cout << "NUMBER OF THREADS " << numberofthreads << endl;
     vector<double> occP(segment.size(),0.);
     vector< vector< double > > occPOneRun ( numberofthreads, vector<double> ( segment.size(), 0. ) );
