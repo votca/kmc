@@ -19,20 +19,19 @@
 #define	_VOTCA_KMC_NODE_H
 
 #include <votca/tools/vec.h>
-#include <votca/kmc/link.h>
+#include <votca/kmc/linksql.h>
 
 namespace votca { namespace kmc {
-
 class Node
 {
 public:
-    Node( int id, tools::vec &position) {
-    _id  = id;
-    _position = position;
+    Node( int id, votca::tools::vec &position) {
+        _id  = id;
+        _position = position;
     } 
 
     /// adds a link to a Node
-    void AddLink( Link* link ) { _links.push_back(link); }
+    virtual void AddLink( Link* link ) { _links.push_back(link); }
     /// link ID - syncing with the pair ID 
     const int &id() const { return _id; } 
     /// type
@@ -44,6 +43,8 @@ public:
         vector< Link* >::iterator it;
         for (it = _links.begin(); it != _links.end(); it++ ) (*it)->Print( out );
     }
+    
+    vector<Link* > &links() {return _links;}
 
 protected:
 

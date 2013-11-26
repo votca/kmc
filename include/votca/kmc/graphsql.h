@@ -20,8 +20,6 @@
 
 #include <vector>
 #include <votca/kmc/graph.h>
-#include <votca/kmc/nodesql.h>
-#include <votca/kmc/linksql.h>
 #include <votca/tools/database.h>
 
 namespace votca { namespace kmc {
@@ -30,85 +28,85 @@ class GraphSQL : public Graph<NodeSQL, LinkSQL> {
 
 public:
    
-    void Initialize();
-    
-    AddNode(_id-1, posX, posY, posZ, UnCnNe, UnCnNh, UcNcCe, UcNcCh, eAnion, eNeutral, eCation, ucCnNe, ucCnNh) {
-        
-    }
-            
-    
-    void Load_graph_segments(string filename);
-    void Load_graph_links(string filename);
+    void Initialize(string filename);
     
 };
 
 inline void GraphSQL::Initialize(string filename){
+    
+    // Load Nodes
     votca::tools::Database db;
     db.Open( filename );
     votca::tools::Statement *stmt = db.Prepare("SELECT _id-1, posX, posY, posZ, UnCnNe, UnCnNh, UcNcCe, UcNcCh, eAnion, eNeutral, eCation, ucCnNe, ucCnNh FROM segments;");
 
-    int id = stmt->Column<double>(0);
-    double PosX = stmt->Column<double>(1);
-    double PosY = stmt->Column<double>(2);
-    double PosZ = stmt->Column<double>(3);
-        
-    AddNode(_id-1, posX, posY, posZ, UnCnNe, UnCnNh, UcNcCe, UcNcCh, eAnion, eNeutral, eCation, ucCnNe, ucCnNh);
-    
-}
+    while (stmt->Step() != SQLITE_DONE) {    
+      
+        int id = stmt->Column<double>(0);
+        double posX = stmt->Column<double>(1);
+        double posY = stmt->Column<double>(2);
+        double posZ = stmt->Column<double>(3);
+        votca::tools::vec position(posX,posY,posZ);
 
-inline void GraphSQL::Load_graph_segments(string filename) {
-    
-    // Load nodes
-    votca::tools::Database db;
-    db.Open( filename );
-    //votca::tools::Statement *stmt = db.Prepare("SELECT _id-1, posX, posY, posZ, UnCnNe, UnCnNh, UcNcCe, UcNcCh, eAnion, eNeutral, eCation, ucCnNe, ucCnNh FROM segments;");
-    
-    // only rates are needed if Coulomb interactions are is not calculated
-    votca::tools::Statement *stmt = db.Prepare("SELECT _id-1, posX, posY, posZ FROM segments;");
-    
-    while (stmt->Step() != SQLITE_DONE) {
-        
-        int id = stmt->Column<int>(0);
+        double UnCnNe = stmt->Column<double>(4);
+        double UnCnNh = stmt->Column<double>(5);
+        double UcNcCe = stmt->Column<double>(6);
+        double UcNcCh = stmt->Column<double>(7);
+        double eAnion = stmt->Column<double>(8);
+        double eNeutral = stmt->Column<double>(9);
+        double eCation = stmt->Column<double>(10);
 
+        double ucCnNe = stmt->Column<double>(11);
+        double ucCnNh = stmt->Column<double>(12);
 
-        
-        NodeSQL *node = AddNode();
-         
-       // myvec node_position = myvec (X, Y, Z);
+        NodeSQL* newNodeSQL = AddNode(id,position);
+        newNodeSQL->setU(UnCnNe, UnCnNh, UcNcCe, UcNcCh);
+        newNodeSQL->setE(eAnion, eNeutral, eCation);
+        newNodeSQL->setu(ucCnNe, ucCnNh);
         
     }
-  
-    delete stmt;
-    stmt = NULL;
-   
-}
-
-inline void GraphSQL::Load_graph_links (string filename) {
     
+    delete stmt;
+
     // Load Node Pairs
-    votca::tools::Database db;
-    db.Open(filename);
-    votca::tools::Statement *stmt = db.Prepare("SELECT seg1-1 AS 'segment1', seg2-1 AS 'segment2', rate12e AS 'rate_e', rate12h AS 'rate_h', drX, drY, drZ, Jeff2e, Jeff2h, lOe, lOh  FROM pairs UNION SELECT seg2-1 AS 'segment1', seg1-1 AS 'segment2', rate21e AS 'rate_e', rate21h AS 'rate_h', -drX AS 'drX', -drY AS 'drY', -drZ AS 'drZ', Jeff2e, Jeff2h, lOe, lOh  FROM pairs ORDER BY segment1;");
 
+    stmt = db.Prepare("SELECT seg1-1 AS 'segment1', seg2-1 AS 'segment2', drX, drY, drZ, rate12e, rate12h, rate21e, rate21h, Jeff2e, Jeff2h, lOe, lOh  FROM pairs UNION SELECT seg2-1 AS 'segment1', seg1-1 AS 'segment2', -drX AS 'drX', -drY AS 'drY', -drZ AS 'drZ', rate21e AS 'rate12e', rate21h AS 'rate12h', rate12e AS 'rate21e', rate12h AS 'rate21h',Jeff2e, Jeff2h, lOe, lOh  FROM pairs ORDER BY segment1;");
+    
+    int id = 0;
+    
     while (stmt->Step() != SQLITE_DONE) {
         
-        int node_ID1 = stmt->Column<int>(0);
-        int node_ID2 = stmt->Column<int>(1);
+//        int id = stmt->Column<int>(0);
         
-        Node* node1 = getnode(node_ID1);
-        Node* node2 = getnode(node_ID2);
-        
-        Link* newLink = new Link();
-        init_node->AddLink(newLink);
-        
-        newLink->SetNodes();
-        newLink->Setnode2(final_node);
+        int node1_id = stmt->Column<int>(0);
+        int node2_id = stmt->Column<int>(1);
+        NodeSQL* node1 = GetNode(node1_id);
+        NodeSQL* node2 = GetNode(node2_id);
 
+        double drX = stmt->Column<double>(2);
+        double drY = stmt->Column<double>(3);
+        double drZ = stmt->Column<double>(4);
+        votca::tools::vec r12(drX,drY,drZ);
+        
+        double rate12e = stmt->Column<double>(5);
+        double rate12h = stmt->Column<double>(6);
+        double rate21e = stmt->Column<double>(7);
+        double rate21h = stmt->Column<double>(8);
+        
+        double Jeff2e = stmt->Column<double>(9);
+        double Jeff2h = stmt->Column<double>(10);
+        
+        double lOe = stmt->Column<double>(11);
+        double lOh = stmt->Column<double>(12);
+        
+        LinkSQL* newLinkSQL = AddLink(id,node1, node2, r12);
+        newLinkSQL->setRate(rate12e,rate12h,rate21e,rate21h);
+        newLinkSQL->setJeff2(Jeff2e,Jeff2h);
+        newLinkSQL->setlO(lOe,lOh);
+        id++;
     }
         
     delete stmt;
     stmt = NULL;
-    
 }
 
 }}

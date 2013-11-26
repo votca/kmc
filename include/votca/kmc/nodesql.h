@@ -26,22 +26,42 @@ namespace votca { namespace kmc {
 class NodeSQL : public Node
 {
 public:
-int id, double posX, double posY, double posZ, 
-            double UnCnNe, double UnCnNh, double UcNcCe, double UcNcCh, 
-            double eAnion, double eNeutral, double eCation, 
-            double ucCnNe, double ucCnNh) : 
-          _id(id), 
-          _UnCnNe(UnCnNe), _UnCnNh(UnCnNh), _UcNcCh(UcNcCh),
-          _eAnion(eAnion), _eNeutral(eNeutral), _eCation(eCation
-    setU(double UnCnNe, double UnCnNh, double UcNcCe, double UcNcCh){
-             ; // FILL IN
+    
+    NodeSQL(int id, tools::vec position) : Node(id, position){
+    };
+
+//    void AddLink( LinkSQL* link ) { _links.push_back(link); }
+    
+    void setU(double UnCnNe, double UnCnNh, double UcNcCe, double UcNcCh){
+        _UnCnNe  = UnCnNe;
+        _UnCnNh  = UnCnNh;
+        _UcNcCe  = UcNcCe;
+        _UcNcCh  = UcNcCh;
     }
          
-    setE(double eAnion, double eNeutral, double eCation) {
-        ;
+    void setE(double eAnion, double eNeutral, double eCation) {
+        _eAnion   = eAnion;
+        _eNeutral = eNeutral;
+        _eCation  = eCation;
+    }
+    
+    void setu(double ucCnNe, double ucCnNh) {
+        _ucCnNe = ucCnNe;
+        _ucCnNh = ucCnNh;
     }
 
-         
+    //Debugging
+    const double &UnCnNe() const { return _UnCnNe; }     
+    const double &UnCnNh() const { return _UnCnNh; }   
+    const double &UcNcCe() const { return _UcNcCe; }   
+    const double &UcNcCh() const { return _UcNcCh; }   
+
+    const double &eAnion() const { return _eAnion; }       
+    const double &eNeutral() const { return _eNeutral; }   
+    const double &eCation() const { return _eCation; }   
+
+    const double &ucCnNe() const { return _ucCnNe; }   
+    const double &ucCnNh() const { return _ucCnNh; }   
     
 private:
 
@@ -57,11 +77,12 @@ private:
     double _ucCnNe;
     double _ucCnNh;
 
+    ;
     
 };
 
 
 }}
 
-#endif	/* _VOTCA_KMC_NODE_H */
+#endif	/* _VOTCA_KMC_NODESQL_H */
 

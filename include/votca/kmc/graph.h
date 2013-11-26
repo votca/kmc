@@ -19,6 +19,8 @@
 #define __VOTCA_KMC_GRAPH_H_
 
 #include <vector>
+#include <votca/kmc/nodesql.h>
+#include <votca/kmc/linksql.h>
 
 namespace votca { namespace kmc {
 
@@ -26,36 +28,60 @@ template<class TNode, class TLink>
 class Graph {
 
 public:
-     Graph() {};
+     Graph() {}
      
     ~Graph() {
         typename std::vector<TNode*>::iterator it;
         for (it = _nodes.begin(); it != _nodes.end(); it++ ) delete *it;
-    };   
+    } 
     
     /// Add a node to the Graph
-    TNode* AddNode(int id, tools::vec &position) { 
+    TNode* AddNode(int id, votca::tools::vec &position) { 
         TNode* node = new TNode(id, position);
         _nodes.push_back(node); 
         return node;
-    }    
+    } 
 
     void AddNode( TNode* node) { _nodes.push_back(node); }
     
-    TNode* getnode(int node_ID) {return _nodes[node_ID];}
+    TNode* GetNode(int node_ID) {return _nodes[node_ID];}
+
+    /// Add a node to the Graph
+    TLink* AddLink( int id, TNode* node1, TNode* node2, votca::tools::vec r12) { 
+        TLink* link = new TLink(id, node1, node2, r12);
+        _links.push_back(link); 
+        return link;
+    }
     
-    void Print(std::ostream& out){
+    void AddLink( TLink* link) { _links.push_back(link); }
+        
+    void RemoveLink(int linknr) { _links.erase(_links.begin()+linknr); }
+    
+    void PrintNodes(std::ostream& out){
         typename std::vector<TNode*>::iterator it;
 //          for (it = _nodes.begin(); it != _nodes.end(); it++ ) (*it)->Print(out);    
-               for (it = _nodes.begin(); it != _nodes.end(); it++ ) out << (*it)->id() << " " << (*it)->position() << endl;    
+        for (it = _nodes.begin(); it != _nodes.end(); it++ ) out << (*it)->id() << " " << (*it)->position() << " " <<
+               (*it)->UnCnNe() << " " << (*it)->UnCnNh() << " " << (*it)->UcNcCe() << " " << (*it)->UcNcCh() << " " <<
+               (*it)->eAnion() << " " << (*it)->eNeutral() << " " << (*it)->eCation() << " " <<
+               (*it)->ucCnNe() << " " << (*it)->ucCnNh() << endl;    
+    }
+
+    void PrintLinks(std::ostream& out){
+        typename std::vector<TLink*>::iterator it;
+//          for (it = _nodes.begin(); it != _nodes.end(); it++ ) (*it)->Print(out);    
+        for (it = _links.begin(); it != _links.end(); it++ ) out << (*it)->id() << " " << 
+               (*it)->r12() << " " << (*it)->rate12e() << " " << (*it)->rate12h() << " " << (*it)->rate21e() << " " << (*it)->rate21h() << " " <<
+               (*it)->Jeff2e() << " " << (*it)->Jeff2h() << " " << (*it)->lOe() << " " << (*it)->lOh() << endl;    
     }
     
     /// initialize nodes and links
-    virtual void Initialize(){;};
+    virtual void Initialize(string filename){;};
+
     
 protected:
+
     std::vector<TNode*> _nodes;
-    std::vector<TLink*> _links;
+    std::vector<TLink*> _links;    
     
 };
 
