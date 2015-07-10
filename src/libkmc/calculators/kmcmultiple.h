@@ -855,7 +855,10 @@ vector<double> KMCMultiple::RunVSSM(vector<Node*> node, double runtime, unsigned
         {
             traj << "'carrier" << i+1 << "_x'\t";    
             traj << "'carrier" << i+1 << "_y'\t";    
-            traj << "'carrier" << i+1 << "_z";    
+            traj << "'carrier" << i+1 << "_z'\t";    
+            traj << "'boxpos" << i+1 << "_x'\t";    
+            traj << "'boxpos" << i+1 << "_y'\t";    
+            traj << "'boxpos" << i+1 << "_z";    
             if(i<numberofcharges-1)
             {
                 traj << "'\t";
@@ -1200,6 +1203,7 @@ vector<double> KMCMultiple::RunVSSM(vector<Node*> node, double runtime, unsigned
                             do_affectedcarrier->node->occupied = 1;
                             temp_node->occupied = 0;
                             cout << "carrier " << do_affectedcarrier->id << " has been instanteneously moved from node " << temp_node->id+1 << " to node " << do_affectedcarrier->node->id+1 << endl << endl; 
+                            if(_outputtime != 0) {traj << "#### TOF BOUNDARY REACHED ####" << endl;}
                             
                             // reset TOF length counter
                             do_affectedcarrier->tof_travelled -= _toflength;
@@ -1234,9 +1238,14 @@ vector<double> KMCMultiple::RunVSSM(vector<Node*> node, double runtime, unsigned
             traj << simtime << "\t";
             for(unsigned int i=0; i<numberofcharges; i++) 
             {
+                // using periodic boundary conditions
                 traj << startposition[i].getX() + carrier[i]->dr_travelled.getX() << "\t";
                 traj << startposition[i].getY() + carrier[i]->dr_travelled.getY() << "\t";
-                traj << startposition[i].getZ() + carrier[i]->dr_travelled.getZ();
+                traj << startposition[i].getZ() + carrier[i]->dr_travelled.getZ() << "\t";
+                // position in box
+                traj << carrier[i]->node->position.getX() <<  "\t";
+                traj << carrier[i]->node->position.getY() <<  "\t";
+                traj << carrier[i]->node->position.getZ();
                 if (i<numberofcharges-1) 
                 {
                     traj << "\t";
