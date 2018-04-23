@@ -46,6 +46,7 @@ script:
      mv -v ${TRAVIS_REPO_SLUG} $HOME/docker;
    else
      git clone --recursive --recursive https://github.com/votca/votca.git $HOME/docker/votca;
+     git -C $HOME/docker/votca checkout 7bea1a3d1be2c76a937390adee206fb16c0ee435 && git -C ${HOME}/docker/votca submodule update --recursive --init;
      if [[ ${TRAVIS_BRANCH} != master ]]; then
        git -C ${HOME}/docker/votca checkout ${TRAVIS_BRANCH} && git -C ${HOME}/docker/votca submodule update --recursive --init;
      fi;
